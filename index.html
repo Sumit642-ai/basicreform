@@ -10,28 +10,150 @@
 
 <form id="myForm">
   <input type="text" name="name" placeholder="Your name" required />
-  <input type="email" name="email" placeholder="Your email" required />
-  <button type="submit">Submit</button>
+  <input type="email" name="email" id="emailInput" placeholder="Your email" required />
+  
+  <button type="button" id="sendOtpBtn">Send OTP</button>
+  
+  <div id="otpSection" style="display:none; margin-top: 10px;">
+    <input type="text" id="otpInput" placeholder="Enter OTP" maxlength="6" />
+    <button type="button" id="verifyOtpBtn">Verify OTP</button>
+    <span id="otpStatus" style="margin-left:10px;"></span>
+  </div>
+  
+  <button type="submit" id="submitBtn" disabled>Submit</button>
 </form>
-<script>
-  const scriptURL = 'https://script.google.com/macros/s/AKfycbwhRjrMVAyixiVf8c7TPkQnh7P38fcvQBEDiM_Lu7nrJC3WdmTGbDROErcF37BvlWrT9Q/exec'; // Paste the web app URL you copied above
 
-  document.getElementById('myForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
+<script>
+  const scriptURL = 'https://script.google.com/macros/s/AKfycbzdGTXsuajqHwckQwDD4hayyyA3P3KWYs4vW63hNRfSPj0c-UsqW80Zg-QBotatHlgc-Q/exec'; // your Apps Script URL here
+  
+  let otpVerified = false;
+  
+  const sendOtpBtn = document.getElementById('sendOtpBtn');
+  const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+  const otpSection = document.getElementById('otpSection');
+  const otpStatus = document.getElementById('otpStatus');
+  const submitBtn = document.getElementById('submitBtn');
+  const emailInput = document.getElementById('emailInput');
+  const otpInput = document.getElementById('otpInput');
+  const form = document.getElementById('myForm');
+  
+  sendOtpBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    otpStatus.textContent = '';
+    otpVerified = false;
+    submitBtn.disabled = true;
+    if (!email) {
+      alert('Please enter an email to send OTP.');
+      return;
+    }
+    
+    sendOtpBtn.disabled = true;
+    sendOtpBtn.textContent = 'Sending OTP...';
+    
     try {
-      await fetch(scriptURL, {
+      const res = await fetch(scriptURL, {
+        method: 'POST',
+        body: new URLSearchParams({
+          action: 'sendOtp',
+          email
+        })
+      });
+      const text = await res.text();
+      if (text === 'OTP sent') {
+        otpSection.style.display = 'block';
+        otpStatus.style.color = 'green';
+        otpStatus.textContent = 'OTP sent to your email.';
+      } else {
+        otpStatus.style.color = 'red';
+        otpStatus.textContent = 'Failed to send OTP: ' + text;
+      }
+    } catch (err) {
+      otpStatus.style.color = 'red';
+      otpStatus.textContent = 'Error sending OTP.';
+    } finally {
+      sendOtpBtn.disabled = false;
+      sendOtpBtn.textContent = 'Send OTP';
+    }
+  });
+  
+  verifyOtpBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    const otp = otpInput.value.trim();
+    otpStatus.textContent = '';
+    if (!otp || otp.length !== 6) {
+      otpStatus.style.color = 'red';
+      otpStatus.textContent = 'Please enter the 6-digit OTP.';
+      return;
+    }
+
+    verifyOtpBtn.disabled = true;
+    verifyOtpBtn.textContent = 'Verifying...';
+    
+    try {
+      const res = await fetch(scriptURL, {
+        method: 'POST',
+        body: new URLSearchParams({
+          action: 'verifyOtp',
+          email,
+          otp
+        })
+      });
+      const text = await res.text();
+      if (text === 'OTP valid') {
+        otpVerified = true;
+        otpStatus.style.color = 'green';
+        otpStatus.textContent = 'OTP verified! You can now submit the form.';
+        submitBtn.disabled = false;
+      } else {
+        otpVerified = false;
+        otpStatus.style.color = 'red';
+        otpStatus.textContent = text; // Shows 'OTP invalid' or 'OTP expired'
+        submitBtn.disabled = true;
+      }
+    } catch (err) {
+      otpStatus.style.color = 'red';
+      otpStatus.textContent = 'Error verifying OTP.';
+      submitBtn.disabled = true;
+    } finally {
+      verifyOtpBtn.disabled = false;
+      verifyOtpBtn.textContent = 'Verify OTP';
+    }
+  });
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!otpVerified) {
+      alert('Please verify OTP before submitting.');
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+    
+    try {
+      const formData = new FormData(form);
+      const res = await fetch(scriptURL, {
         method: 'POST',
         body: new URLSearchParams(formData)
       });
-      alert('Submitted!');
-      this.reset();
+      const text = await res.text();
+      if (text === 'ok') {
+        alert('Form submitted successfully!');
+        form.reset();
+        otpSection.style.display = 'none';
+        otpStatus.textContent = '';
+        submitBtn.disabled = true;
+        otpVerified = false;
+      } else {
+        alert('Submission failed: ' + text);
+      }
     } catch (err) {
-      alert('Submission failed.');
+      alert('Error submitting form.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit';
     }
   });
 </script>
 
-</script>
 </body>
 </html>
